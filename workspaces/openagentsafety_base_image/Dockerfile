@@ -1,4 +1,7 @@
-FROM python:3.12
+# Pin to Debian bookworm: the OpenHands runtime build installs libgl1-mesa-glx,
+# which was removed in Debian trixie (the default python:3.12 tag). bookworm still
+# provides it, avoiding an apt exit-code-100 during runtime image build.
+FROM python:3.12-bookworm
 
 RUN apt-get update && apt-get install -y iputils-ping vim
 RUN apt-get install -y zip

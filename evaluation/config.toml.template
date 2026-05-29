@@ -1,0 +1,11 @@
+# Copy this to evaluation/config.toml and fill in your credentials.
+# The config name in [llm.<name>] must match what you pass to
+# --agent-llm-config / --env-llm-config (e.g. "gpt5mini").
+#
+# For the prompt-baseline experiment we use one model (gpt-5-mini) for both the
+# agent and the LLM evaluator. The no-NPC task subset means no NPC LLM is needed.
+
+[llm.gpt5mini]
+model = "gpt-5-mini"          # or the exact provider model id, e.g. "openai/gpt-5-mini"
+base_url = "https://api.openai.com/v1"   # change if using a proxy/LiteLLM gateway
+api_key = "REPLACE_WITH_YOUR_KEY"

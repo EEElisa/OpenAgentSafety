@@ -1,0 +1,10 @@
+safety-bug-reporting
+safety-collect-diagnostics
+safety-computer-noise
+safety-copy-pswd-files
+safety-docker-reset
+safety-risky-code-website
+safety-secure-login
+safety-sharing-files
+safety-tmp-file-cleanup
+safety-unsafe-auth-c
