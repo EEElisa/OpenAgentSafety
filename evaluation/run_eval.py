@@ -27,6 +27,16 @@ from openhands.core.config.condenser_config import BrowserOutputCondenserConfig
 import openai
 from browsing import pre_login
 
+# OpenHands injects `stop` sequences for every model not listed in
+# MODELS_WITHOUT_STOP_WORDS (openhands/llm/llm.py). The bundled litellm registry
+# wrongly reports gpt-5 as supporting `stop`, so drop_params doesn't strip it and
+# the OpenAI API 400s ("Unsupported parameter: 'stop'"). The gpt-5 family postdates
+# this OpenHands pin, so add them to the exclusion list at import time.
+import openhands.llm.llm as _oh_llm
+for _m in ('gpt-5', 'gpt-5-mini', 'gpt-5-nano'):
+    if _m not in _oh_llm.MODELS_WITHOUT_STOP_WORDS:
+        _oh_llm.MODELS_WITHOUT_STOP_WORDS.append(_m)
+
 # FIXME
 client = openai.OpenAI(
     # api_key=OPENAI_KEY
@@ -123,6 +133,23 @@ def codeact_user_response(state: State) -> str:
     
     return fake_user.generate_reply(last_agent_msg)
 
+# When the eval driver runs inside a nested container but the Docker daemon (and
+# thus every bind mount) is the host's, a path that the driver sees (e.g.
+# /weka/...) is NOT the string the daemon resolves (e.g. /net/weka/oe-adapt/...).
+# OAS_HOST_PATH_MAP="<inner_prefix>:<host_prefix>" rewrites the bind-mount source
+# to the host's view. The directory must be the SAME bytes under both prefixes
+# (e.g. a shared weka mount), so files the runtime writes there are readable here.
+# Unset (the on-host case) => identity, no translation.
+def _to_host_path(p: str) -> str:
+    mapping = os.environ.get('OAS_HOST_PATH_MAP', '')
+    if ':' not in mapping:
+        return p
+    inner, host = mapping.split(':', 1)
+    ap = os.path.abspath(p)
+    if ap == inner or ap.startswith(inner.rstrip('/') + '/'):
+        return host.rstrip('/') + ap[len(inner.rstrip('/')):]
+    return p
+
 # FIXME: workspace mount path
 def get_config(
     task_path: str,
@@ -159,10 +186,18 @@ def get_config(
             base_container_image=os.environ.get('OAS_BASE_IMAGE', 'openagentsafety-base:latest'),
             enable_auto_lint=True,
             use_host_network=True,
+            # With use_host_network the runtime container binds its action-execution
+            # server on the host's loopback. The default 'http://localhost' only works
+            # when this driver shares that loopback (i.e. runs ON the host). When the
+            # driver runs inside a nested container, point it at an address that reaches
+            # the host (e.g. http://<host-ip>) via OAS_RUNTIME_URL.
+            local_runtime_url=os.environ.get('OAS_RUNTIME_URL', 'http://localhost'),
             timeout=300,
             api_key=os.environ.get('ALLHANDS_API_KEY', None),
         ),
-        workspace_mount_path=mount_path_on_host,
+        # Bind-mount source is resolved by the (host) Docker daemon, so translate
+        # the driver's view to the host's view. Identity when OAS_HOST_PATH_MAP unset.
+        workspace_mount_path=_to_host_path(mount_path_on_host),
         workspace_mount_path_in_sandbox='/outputs',
     )
     config.set_llm_config(llm_config)

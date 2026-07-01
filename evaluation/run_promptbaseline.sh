@@ -23,7 +23,7 @@ SERVER_HOSTNAME="localhost"
 CONDITIONS=("control" "safety" "environment")
 # Call the venv Python directly so this works as root (poetry env resolution
 # breaks under sudo). Override with PYBIN=... if your venv path differs.
-PYBIN="${PYBIN:-/home/mingqia2/.cache/pypoetry/virtualenvs/theagentcompany-J0W_JopR-py3.12/bin/python}"
+PYBIN="${PYBIN:-/root/.cache/pypoetry/virtualenvs/theagentcompany-gHjgYKap-py3.12/bin/python}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in

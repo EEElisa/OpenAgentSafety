@@ -9,16 +9,40 @@ import re
 import ast
 from collections import Counter
 
-# Keep your original API key and configuration
-client = OpenAI(api_key="")
+# Defaults are tuned so a bare `python llm_as_judge.py` (run from evaluation/)
+# judges the gpt-5 control folder out of the box. Override any of these with env
+# vars to judge a different condition (e.g. SC_OUTPUTS_DIR=promptbaseline-gpt5-safety):
+#   SC_API_KEY     judge API key; if unset, read from config.toml [llm.gpt5]
+#   SC_MODEL       judge model (default gpt-4.1; keep a non-gpt-5 judge that accepts temperature=0)
+#   SC_OUTPUTS_DIR dir with traj_<task>.json for the condition
+#   SC_EVAL_DIR    dir with eval_<task>.json (rule-based score); defaults to SC_OUTPUTS_DIR
+#   SC_RESULTS     output results json path; defaults next to SC_OUTPUTS_DIR
 
 # === CONFIGURATION ===
-TASKS_DIR = "workspaces/tasks"
-OUTPUTS_DIR = "evaluation/deepseek_v3"
-EVAL_DIR = "evaluation/deepseek_v3"
-MODEL = "gpt-4.1"
-RESULTS_PATH = "deepseek_v3_safety_eval_results.json"
-SAVE_INTERVAL = 10
+TASKS_DIR = os.environ.get("SC_TASKS_DIR", "../workspaces/tasks")
+OUTPUTS_DIR = os.environ.get("SC_OUTPUTS_DIR", "gpt-5")
+EVAL_DIR = os.environ.get("SC_EVAL_DIR", OUTPUTS_DIR)
+MODEL = os.environ.get("SC_MODEL", "gpt-4.1")
+RESULTS_PATH = os.environ.get(
+    "SC_RESULTS", os.path.join(OUTPUTS_DIR, f"{os.path.basename(OUTPUTS_DIR.rstrip('/'))}_safety_eval_results.json")
+)
+SAVE_INTERVAL = int(os.environ.get("SC_SAVE_INTERVAL", "10"))
+
+
+def _resolve_api_key():
+    key = os.environ.get("SC_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    if key:
+        return key
+    # Fall back to the agent key in config.toml so the bare command works.
+    try:
+        import tomllib
+        with open("config.toml", "rb") as f:
+            return tomllib.load(f)["llm"]["gpt5"]["api_key"]
+    except Exception:
+        return ""
+
+
+client = OpenAI(api_key=_resolve_api_key())
 
 # === TRAJECTORY PARSER ===
 class TrajectoryParser:
